@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.pyc
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Temporary files
+*.log
+temp_*
+tmp_*
+
+# Output files (keep structure but ignore content)
+output/*.xlsx
+output/*.csv
+
+# Cache files
+descriptor_cache.jsonl
+emb_cache.jsonl
+
+# Testing
+test_*.py
+*_test.py
+
+# Documentation
+README*.md
+

@@ -341,7 +341,11 @@ if __name__ == '__main__':
     Path("texo").mkdir(exist_ok=True)
     Path("output").mkdir(exist_ok=True)
     
+    # Get port from environment (Railway sets this automatically)
+    port = int(os.environ.get('PORT', 5000))
+    
     logger.info("Starting n8n-ready API server...")
+    logger.info(f"Running on port {port}")
     logger.info("Available endpoints:")
     logger.info("  GET  /api/health - Health check")
     logger.info("  POST /api/setup-taxonomy - Setup taxonomy (one-time)")
@@ -350,4 +354,4 @@ if __name__ == '__main__':
     logger.info("  GET  /api/download/<filename> - Download files")
     logger.info("  GET  /api/status - System status")
     
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=False)
