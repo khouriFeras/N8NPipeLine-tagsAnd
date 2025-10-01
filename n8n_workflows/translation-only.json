@@ -1,0 +1,205 @@
+{
+  "name": "Translation with Download Solution (Fixed)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression"
+            }
+          ]
+        }
+      },
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEETS_ID_HERE",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "list"
+        },
+        "options": {}
+      },
+      "id": "google-sheets",
+      "name": "Read Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nif (!items || items.length === 0) {\n  throw new Error('No data from Google Sheets');\n}\nconst headers = Object.keys(items[0].json);\nconst csvRows = [headers.join(',')];\nconst sampleSize = 5;\nconst sampleItems = items.slice(0, sampleSize);\nsampleItems.forEach(item => {\n  const row = headers.map(header => {\n    let value = String(item.json[header] || '');\n    if (value.includes(',') || value.includes('\"') || value.includes('\\n')) {\n      value = '\"' + value.replace(/\"/g, '\"\"') + '\"';\n    }\n    return value;\n  });\n  csvRows.push(row.join(','));\n});\nreturn {\n  json: {\n    csv_content: csvRows.join('\\n'),\n    total_rows: items.length,\n    sample_rows: sampleItems.length,\n    product_context: 'tools and equipment',\n    sample: sampleItems.length\n  }\n};"
+      },
+      "id": "prepare-csv",
+      "name": "Prepare CSV",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:5000/process",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "csv_content",
+              "value": "={{ $json.csv_content }}"
+            },
+            {
+              "name": "product_context", 
+              "value": "={{ $json.product_context }}"
+            },
+            {
+              "name": "sample",
+              "value": "={{ $json.sample }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "call-translation",
+      "name": "Call Translation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nif (response.success) {\n  const fileId = response.file_id || '';\n  return {\n    json: {\n      success: true,\n      message: 'Translation and SEO processing completed! Ready to download.',\n      file_id: fileId,\n      download_url: `http://host.docker.internal:5000/download/${fileId}`,\n      translation_details: {\n        total_processed: response.result?.total_processed || 0,\n        translation_successful: response.result?.translation_successful || 0,\n        seo_successful: response.result?.seo_successful || 0,\n        failed: response.result?.failed || 0,\n        output_size: response.output_size\n      },\n      output_columns: response.output_columns || [\n        'arabic description', 'product_title_ar', 'meta_title', 'meta_description', 'handle_ar'\n      ],\n      features: response.features || {\n        translation: 'Arabic product descriptions and titles',\n        seo: 'Meta titles, descriptions, and SEO-friendly handles',\n        combined: 'All data appended to new columns in the output file'\n      }\n    }\n  };\n} else {\n  return {\n    json: {\n      success: false,\n      error: response.error || 'Translation and SEO processing failed'\n    }\n  };\n}"
+      },
+      "id": "process-results",
+      "name": "Process Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.download_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "download-file",
+      "name": "Download File",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const translationData = $input.first().json;\nconst downloadData = $input.last();\n\nreturn {\n  json: {\n    success: true,\n    message: 'Translation and SEO processing completed and file downloaded successfully!',\n    translation_summary: {\n      total_processed: translationData.translation_details?.total_processed || 'unknown',\n      translation_successful: translationData.translation_details?.translation_successful || 'unknown',\n      seo_successful: translationData.translation_details?.seo_successful || 'unknown',\n      failed: translationData.translation_details?.failed || 0,\n      output_size: translationData.translation_details?.output_size\n    },\n    file_info: {\n      downloaded: downloadData.binary ? 'Yes' : 'No',\n      file_size: downloadData.binary?.data?.length || 0,\n      filename: 'translated_products_with_seo.xlsx'\n    },\n    output_columns: translationData.output_columns || [\n      'arabic description', 'product_title_ar', 'meta_title', 'meta_description', 'handle_ar'\n    ],\n    features: translationData.features || {\n      translation: 'Arabic product descriptions and titles',\n      seo: 'Meta titles, descriptions, and SEO-friendly handles',\n      combined: 'All data appended to new columns in the output file'\n    },\n    arabic_content_generated: [\n      'Arabic product descriptions and titles',\n      'Arabic SEO meta titles optimized for search engines',\n      'Arabic SEO meta descriptions for better visibility',\n      'SEO-friendly handles for URL generation',\n      'Combined translation and SEO data in new columns'\n    ],\n    completion_message: [\n      'Your products now have complete Arabic translations and SEO optimization!',\n      'Ready for Arabic-speaking markets with enhanced search visibility',\n      'All translation and SEO data appended to new columns',\n      'Download the Excel file with combined translation and SEO data'\n    ]\n  },\n  binary: downloadData.binary\n};"
+      },
+      "id": "final-results",
+      "name": "Final Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 300]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Prepare CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare CSV": {
+      "main": [
+        [
+          {
+            "node": "Call Translation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Translation": {
+      "main": [
+        [
+          {
+            "node": "Process Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Results": {
+      "main": [
+        [
+          {
+            "node": "Download File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download File": {
+      "main": [
+        [
+          {
+            "node": "Final Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
+

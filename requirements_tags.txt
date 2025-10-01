@@ -1,0 +1,16 @@
+# Core packages
+pandas>=1.5.0
+numpy>=1.21.0
+openpyxl>=3.0.0
+tenacity>=8.0.0
+openai>=1.0.0
+
+# Optional packages for enhanced functionality
+faiss-cpu>=1.7.0  # For FAISS indexing (optional)
+python-slugify>=6.0.0  # For text slugification (optional)
+xlrd>=2.0.1  # For reading old .xls files (optional)
+
+# Additional packages that might be needed
+pathlib2>=2.3.0  # For older Python versions (if needed)
+Flask>=3.0.0
+Flask-CORS>=4.0.0

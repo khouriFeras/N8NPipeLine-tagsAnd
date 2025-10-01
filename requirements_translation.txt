@@ -1,0 +1,14 @@
+# Core dependencies for translation and SEO generation
+pandas>=2.0.0
+openpyxl>=3.1.0
+openai>=1.0.0
+tenacity>=8.0.0
+tqdm>=4.65.0
+
+# Optional dependencies for web service
+flask>=2.3.0
+werkzeug>=2.3.0
+
+# Development dependencies (optional)
+python-dotenv>=1.0.0
+

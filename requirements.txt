@@ -1,0 +1,37 @@
+# Unified Requirements for Translation, SEO, and Product Tagging System
+# This file combines all dependencies from both translation and tagging systems
+
+# Core data processing
+pandas>=2.0.0
+numpy>=1.24.0
+openpyxl>=3.1.0
+pyarrow>=14.0.0
+xlrd>=2.0.1
+
+# OpenAI API
+openai>=1.0.0
+
+# Retry logic and utilities
+tenacity>=8.0.0
+tqdm>=4.65.0
+python-dateutil>=2.8.0
+pathlib2>=2.3.0
+
+# Text processing and SEO
+python-slugify>=8.0.0
+
+# FAISS for similarity search (for tagging)
+faiss-cpu>=1.7.0
+
+# Flask web framework
+Flask>=2.3.0
+Flask-CORS>=4.0.0
+werkzeug>=2.3.0
+
+# Environment management
+python-dotenv>=1.0.0
+
+# Additional utilities
+requests>=2.28.0
+urllib3>=1.26.0
+

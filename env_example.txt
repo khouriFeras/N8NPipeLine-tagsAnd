@@ -1,0 +1,14 @@
+# Environment Variables for Unified Product System
+# Copy this file to .env and add your actual values
+
+# OpenAI API Key (Required)
+OPENAI_API_KEY=your_openai_api_key_here
+
+# Flask Configuration (Optional)
+FLASK_ENV=development
+FLASK_DEBUG=True
+FLASK_PORT=5000
+
+# Logging Level (Optional)
+LOG_LEVEL=INFO
+

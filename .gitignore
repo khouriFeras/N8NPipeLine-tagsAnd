@@ -1,0 +1,35 @@
+# Temporary files
+.texo_last_run
+test*.xlsx
+test*.csv
+*upload_template_final.xlsx
+*pseudo_labels.csv
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environment
+venv/
+env/
+ENV/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Cache files (keep these for performance)
+# descriptor_cache.jsonl
+# emb_cache.jsonl
