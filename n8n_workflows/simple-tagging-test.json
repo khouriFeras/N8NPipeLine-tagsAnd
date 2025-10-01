@@ -33,7 +33,7 @@
           "response": {
             "response": {
               "neverError": true,
-              "responseFormat": "text"
+              "responseFormat": "json"
             }
           }
         }
@@ -46,7 +46,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Process the tagging results (handle text response with NaN values)\nconst responseText = $input.first().json;\n\nconsole.log('Raw Response:', responseText);\n\n// Clean the JSON by replacing NaN values\nconst cleanedJson = responseText\n  .replace(/:\\s*NaN/g, ': null')  // Replace : NaN with : null\n  .replace(/:\\s*Infinity/g, ': null')  // Replace : Infinity with : null\n  .replace(/:\\s*-Infinity/g, ': null'); // Replace : -Infinity with : null\n\nconsole.log('Cleaned JSON:', cleanedJson);\n\nlet response;\ntry {\n  response = JSON.parse(cleanedJson);\n} catch (error) {\n  console.error('JSON Parse Error:', error);\n  return {\n    json: {\n      success: false,\n      error: 'Failed to parse API response: ' + error.message,\n      raw_response: responseText\n    }\n  };\n}\n\nconsole.log('Parsed Response:', JSON.stringify(response, null, 2));\n\nif (response.status === 'success' && response.data) {\n  return {\n    json: {\n      success: true,\n      message: 'Products tagged successfully!',\n      total_products: response.stats?.total_products || 0,\n      tagged_products: response.stats?.tagged_products || 0,\n      results: response.data.map(product => ({\n        title: product.Title,\n        tags: product.tags,\n        confidence: product.confidence\n      }))\n    }\n  };\n} else {\n  return {\n    json: {\n      success: false,\n      error: response.message || 'Tagging failed',\n      raw_response: response\n    }\n  };\n}"
+        "jsCode": "// Process the tagging results\nconst response = $input.first().json;\n\nconsole.log('Tagging Response:', JSON.stringify(response, null, 2));\n\n// Handle NaN values in the response by cleaning them\nconst cleanResponse = JSON.parse(JSON.stringify(response, (key, value) => {\n  if (typeof value === 'number' && (isNaN(value) || !isFinite(value))) {\n    return null;\n  }\n  return value;\n}));\n\nconsole.log('Cleaned Response:', JSON.stringify(cleanResponse, null, 2));\n\nif (cleanResponse.status === 'success' && cleanResponse.data) {\n  return {\n    json: {\n      success: true,\n      message: 'Products tagged successfully!',\n      total_products: cleanResponse.stats?.total_products || 0,\n      tagged_products: cleanResponse.stats?.tagged_products || 0,\n      results: cleanResponse.data.map(product => ({\n        title: product.Title,\n        tags: product.tags,\n        confidence: product.confidence\n      }))\n    }\n  };\n} else {\n  return {\n    json: {\n      success: false,\n      error: cleanResponse.message || 'Tagging failed',\n      raw_response: cleanResponse\n    }\n  };\n}"
       },
       "id": "process-results",
       "name": "Process Results",
