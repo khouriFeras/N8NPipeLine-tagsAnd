@@ -59,7 +59,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://jafartrans-tags.up.railway.app/process",
+        "url": "https://jafartrans-tags.up.railway.app/api/tag-products-simple",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -73,16 +73,8 @@
         "bodyParameters": {
           "parameters": [
             {
-              "name": "csv_content",
-              "value": "={{ $json.csv_content }}"
-            },
-            {
-              "name": "product_context",
-              "value": "={{ $json.product_context }}"
-            },
-            {
-              "name": "sample",
-              "value": "={{ $json.sample }}"
+              "name": "products_data",
+              "value": "={{ $json.products_data }}"
             }
           ]
         },
@@ -245,7 +237,7 @@
           "response": {
             "response": {
               "neverError": true,
-              "responseFormat": "file"
+              "responseFormat": "text"
             }
           },
           "timeout": 600000
