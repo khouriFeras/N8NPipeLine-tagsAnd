@@ -342,7 +342,7 @@ if __name__ == '__main__':
     Path("output").mkdir(exist_ok=True)
     
     # Get port from environment (Railway sets this automatically)
-    port = int(os.environ.get('PORT', 5000))
+    port = int(os.environ.get('PORT', 5001))
     
     logger.info("Starting n8n-ready API server...")
     logger.info(f"Running on port {port}")
