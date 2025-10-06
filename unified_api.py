@@ -211,7 +211,8 @@ def setup_taxonomy():
         logger.info("Step 1: Generating descriptors...")
         import sys
         old_argv = sys.argv
-        sys.argv = ['gen_descriptors.py', '--inp', taxonomy_file, '--out', _taxonomy_path, '--model', 'gpt-4o-mini', '--batch', '12']
+        # Try different column name variations for TEXO file
+        sys.argv = ['gen_descriptors.py', '--inp', taxonomy_file, '--sheet', 'Tags', '--l1', 'L1', '--l2', 'L2', '--l3', 'L3', '--l4', 'L4', '--out', _taxonomy_path, '--model', 'gpt-4o-mini', '--batch', '12', '--log-level', 'INFO']
         gen_descriptors_main()
         sys.argv = old_argv
         
@@ -274,8 +275,8 @@ def tag_products_simple():
         
         # Create temporary files for processing
         with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8') as temp_csv:
-            # Write CSV header
-            temp_csv.write("Title,Product Type,Vendor,Body (HTML)\n")
+            # Write CSV header with Cleaned_Body column
+            temp_csv.write("Title,Product Type,Vendor,Body (HTML),Cleaned_Body\n")
             
             # Write product data
             for product in products:
@@ -283,8 +284,10 @@ def tag_products_simple():
                 product_type = product.get('Product Type', '').replace('"', '""')
                 vendor = product.get('Vendor', '').replace('"', '""')
                 body = product.get('Body (HTML)', '').replace('"', '""').replace('\n', ' ').replace('\r', ' ')
+                # Cleaned_Body is the same as Body (HTML) but cleaned
+                cleaned_body = body.replace('<br>', ' ').replace('<p>', ' ').replace('</p>', ' ').replace('<div>', ' ').replace('</div>', ' ').strip()
                 
-                temp_csv.write(f'"{title}","{product_type}","{vendor}","{body}"\n')
+                temp_csv.write(f'"{title}","{product_type}","{vendor}","{body}","{cleaned_body}"\n')
             
             temp_csv_path = temp_csv.name
         
