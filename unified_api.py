@@ -309,6 +309,14 @@ def tag_products_simple():
                 results_df = pd.read_csv(temp_output_path)
                 results = results_df.to_dict('records')
                 
+                # Clean up NaN values to make JSON serializable
+                for result in results:
+                    for key, value in result.items():
+                        if pd.isna(value) or value == 'nan' or str(value).lower() == 'nan':
+                            result[key] = None
+                        elif isinstance(value, (int, float)) and (value != value):  # Check for NaN
+                            result[key] = None
+                
                 # Clean up temp files
                 os.unlink(temp_csv_path)
                 os.unlink(temp_output_path)
