@@ -247,12 +247,13 @@ def tag_products_simple():
         if not check_taxonomy_ready():
             return jsonify({
                 "status": "error",
-                "message": "Taxonomy not ready. Please run /api/setup-taxonomy first to generate taxonomy descriptors and embeddings.",
+                "message": "Taxonomy not ready. The system requires taxonomy descriptors and embeddings to be generated first.",
                 "taxonomy_ready": False,
                 "required_files": {
                     "descriptors": _taxonomy_path,
                     "embeddings": _embeddings_path
-                }
+                },
+                "solution": "Please run the setup-taxonomy endpoint first to generate the required taxonomy files."
             }), 400
         
         data = request.get_json()
@@ -269,7 +270,7 @@ def tag_products_simple():
                 "message": "products_data must be a list"
             }), 400
         
-        logger.info(f"Processing {len(products)} products for tagging")
+        logger.info(f"Processing {len(products)} products for tagging using taxonomy: {_taxonomy_path}")
         
         # Create temporary files for processing
         with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8') as temp_csv:
@@ -320,14 +321,14 @@ def tag_products_simple():
             else:
                 return jsonify({
                     "status": "error",
-                    "message": "No results generated"
+                    "message": "No results generated from taxonomy processing"
                 }), 500
                 
         except Exception as e:
-            logger.error(f"Tagging failed: {str(e)}")
+            logger.error(f"Taxonomy tagging failed: {str(e)}")
             return jsonify({
                 "status": "error",
-                "message": str(e)
+                "message": f"Taxonomy processing failed: {str(e)}"
             }), 500
             
         finally:
