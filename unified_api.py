@@ -209,24 +209,17 @@ def setup_taxonomy():
         
         # Step 1: Generate descriptors
         logger.info("Step 1: Generating descriptors...")
-        gen_args = gen_descriptors_parse([
-            '--inp', taxonomy_file,
-            '--out', _taxonomy_path,
-            '--model', 'gpt-4o-mini',
-            '--batch', '12'
-        ])
-        gen_descriptors_main(gen_args)
+        import sys
+        old_argv = sys.argv
+        sys.argv = ['gen_descriptors.py', '--inp', taxonomy_file, '--out', _taxonomy_path, '--model', 'gpt-4o-mini', '--batch', '12']
+        gen_descriptors_main()
+        sys.argv = old_argv
         
         # Step 2: Create embeddings
         logger.info("Step 2: Creating embeddings...")
-        knn_args = knn_parse([
-            '--inp', _taxonomy_path,
-            '--out', _embeddings_path,
-            '--model', 'text-embedding-3-large',
-            '--batch', '64',
-            '--faiss'
-        ])
-        knn_main(knn_args)
+        sys.argv = ['KNN_retriver.py', '--inp', _taxonomy_path, '--out', _embeddings_path, '--model', 'text-embedding-3-large', '--batch', '64', '--faiss']
+        knn_main()
+        sys.argv = old_argv
         
         # Update global state
         global _taxonomy_ready
@@ -295,17 +288,11 @@ def tag_products_simple():
         
         try:
             # Run bootstrap pseudolabels
-            bootstrap_args = bootstrap_parse([
-                '--nodes', _embeddings_path,
-                '--descriptors', _taxonomy_path,
-                '--products', temp_csv_path,
-                '--out', temp_output_path,
-                '--embed-model', 'text-embedding-3-large',
-                '--llm-model', 'gpt-4o-mini',
-                '--topk', '8',
-                '--conf-thresh', '0.85'
-            ])
-            bootstrap_main(bootstrap_args)
+            import sys
+            old_argv = sys.argv
+            sys.argv = ['bootstrap_pseudolabels.py', '--nodes', _embeddings_path, '--descriptors', _taxonomy_path, '--products', temp_csv_path, '--out', temp_output_path, '--embed-model', 'text-embedding-3-large', '--llm-model', 'gpt-4o-mini', '--topk', '8', '--conf-thresh', '0.85']
+            bootstrap_main()
+            sys.argv = old_argv
             
             # Read results
             if os.path.exists(temp_output_path):
