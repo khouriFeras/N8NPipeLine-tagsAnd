@@ -241,8 +241,20 @@ def setup_taxonomy():
 
 @app.route('/api/tag-products-simple', methods=['POST'])
 def tag_products_simple():
-    """Tag products using JSON data - Simplified version"""
+    """Tag products using JSON data"""
     try:
+        # Check if taxonomy is ready first
+        if not check_taxonomy_ready():
+            return jsonify({
+                "status": "error",
+                "message": "Taxonomy not ready. Please run /api/setup-taxonomy first to generate taxonomy descriptors and embeddings.",
+                "taxonomy_ready": False,
+                "required_files": {
+                    "descriptors": _taxonomy_path,
+                    "embeddings": _embeddings_path
+                }
+            }), 400
+        
         data = request.get_json()
         if not data or 'products_data' not in data:
             return jsonify({
