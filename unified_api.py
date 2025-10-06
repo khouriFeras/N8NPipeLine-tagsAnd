@@ -259,92 +259,71 @@ def tag_products_simple():
         
         logger.info(f"Processing {len(products)} products for tagging")
         
-        # Enhanced tagging logic based on product analysis
-        results = []
-        for i, product in enumerate(products):
-            title = product.get('Title', '').lower()
-            product_type = product.get('Product Type', '').lower()
-            description = product.get('Body (HTML)', '').lower()
+        # Create temporary files for processing
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8') as temp_csv:
+            # Write CSV header
+            temp_csv.write("Title,Product Type,Vendor,Body (HTML)\n")
             
-            # Combine all text for better analysis
-            all_text = f"{title} {product_type} {description}"
+            # Write product data
+            for product in products:
+                title = product.get('Title', '').replace('"', '""')
+                product_type = product.get('Product Type', '').replace('"', '""')
+                vendor = product.get('Vendor', '').replace('"', '""')
+                body = product.get('Body (HTML)', '').replace('"', '""').replace('\n', ' ').replace('\r', ' ')
+                
+                temp_csv.write(f'"{title}","{product_type}","{vendor}","{body}"\n')
             
-            # Enhanced tagging logic
-            tags = []
-            
-            # Main category detection
-            if any(word in all_text for word in ['drill', 'drilling', 'perforator', 'perforadora']):
-                tags = ["tools", "power-tools", "drills"]
-            elif any(word in all_text for word in ['hammer', 'martillo', 'marteau']):
-                tags = ["tools", "hand-tools", "hammers"]
-            elif any(word in all_text for word in ['saw', 'sierra', 'scie', 'cutting', 'corte']):
-                tags = ["tools", "cutting-tools", "saws"]
-            elif any(word in all_text for word in ['wrench', 'llave', 'clé', 'spanner']):
-                tags = ["tools", "hand-tools", "wrenches"]
-            elif any(word in all_text for word in ['screwdriver', 'destornillador', 'tournevis']):
-                tags = ["tools", "hand-tools", "screwdrivers"]
-            elif any(word in all_text for word in ['pliers', 'alicates', 'pinces']):
-                tags = ["tools", "hand-tools", "pliers"]
-            elif any(word in all_text for word in ['level', 'nivel', 'niveau', 'spirit']):
-                tags = ["tools", "measuring-tools", "levels"]
-            elif any(word in all_text for word in ['tape', 'cinta', 'ruban', 'measure']):
-                tags = ["tools", "measuring-tools", "tape-measures"]
-            elif any(word in all_text for word in ['battery', 'batería', 'batterie', 'rechargeable']):
-                tags = ["tools", "power-tools", "battery-powered"]
-            elif any(word in all_text for word in ['cordless', 'inalámbrico', 'sans fil']):
-                tags = ["tools", "power-tools", "cordless"]
-            elif any(word in all_text for word in ['kit', 'set', 'juego', 'jeu', 'combo']):
-                tags = ["tools", "tool-sets", "kits"]
-            elif any(word in all_text for word in ['safety', 'seguridad', 'sécurité', 'helmet', 'goggles']):
-                tags = ["safety", "protective-equipment", "safety-gear"]
-            elif any(word in all_text for word in ['clothing', 'ropa', 'vêtements', 'uniform', 'workwear']):
-                tags = ["clothing", "workwear", "uniforms"]
-            elif any(word in all_text for word in ['electrical', 'eléctrico', 'électrique', 'wire', 'cable']):
-                tags = ["electrical", "wiring", "cables"]
-            elif any(word in all_text for word in ['plumbing', 'plomería', 'plomberie', 'pipe', 'water']):
-                tags = ["plumbing", "pipes", "water-systems"]
-            elif any(word in all_text for word in ['automotive', 'automotriz', 'automobile', 'car', 'vehicle']):
-                tags = ["automotive", "vehicle-parts", "car-accessories"]
-            elif any(word in all_text for word in ['kitchen', 'cocina', 'cuisine', 'cooking', 'food']):
-                tags = ["kitchen", "cooking", "food-preparation"]
-            elif any(word in all_text for word in ['garden', 'jardín', 'jardin', 'outdoor', 'lawn']):
-                tags = ["garden", "outdoor", "landscaping"]
-            elif any(word in all_text for word in ['cleaning', 'limpieza', 'nettoyage', 'mop', 'brush']):
-                tags = ["cleaning", "maintenance", "hygiene"]
-            else:
-                # Default based on product type
-                if 'tool' in product_type:
-                    tags = ["tools", "general-tools"]
-                elif 'equipment' in product_type:
-                    tags = ["equipment", "general-equipment"]
-                elif 'accessory' in product_type:
-                    tags = ["accessories", "general-accessories"]
-                else:
-                    tags = ["general", "miscellaneous"]
-            
-            # Join tags with commas
-            tags_string = ",".join(tags)
-            
-            results.append({
-                "Title": product.get('Title', ''),
-                "Product Type": product.get('Product Type', ''),
-                "Vendor": product.get('Vendor', ''),
-                "Body (HTML)": product.get('Body (HTML)', ''),
-                "tags": tags_string,
-                "confidence": 0.85,
-                "product_id": f"prod_{i+1}",
-                "choice_id": f"choice_{i+1}",
-                "verified": 1
-            })
+            temp_csv_path = temp_csv.name
         
-        return jsonify({
-            "status": "success",
-            "data": results,
-            "stats": {
-                "total_products": len(products),
-                "tagged_products": len(results)
-            }
-        })
+        # Create temporary output file
+        temp_output = tempfile.NamedTemporaryFile(suffix='.csv', delete=False)
+        temp_output_path = temp_output.name
+        temp_output.close()
+        
+        try:
+            # Run bootstrap pseudolabels with real taxonomy
+            import sys
+            old_argv = sys.argv
+            sys.argv = ['bootstrap_pseudolabels.py', '--nodes', _embeddings_path, '--descriptors', _taxonomy_path, '--products', temp_csv_path, '--out', temp_output_path, '--embed-model', 'text-embedding-3-large', '--llm-model', 'gpt-4o-mini', '--topk', '8', '--conf-thresh', '0.85']
+            bootstrap_main()
+            sys.argv = old_argv
+            
+            # Read results
+            if os.path.exists(temp_output_path):
+                results_df = pd.read_csv(temp_output_path)
+                results = results_df.to_dict('records')
+                
+                # Clean up temp files
+                os.unlink(temp_csv_path)
+                os.unlink(temp_output_path)
+                
+                return jsonify({
+                    "status": "success",
+                    "data": results,
+                    "stats": {
+                        "total_products": len(products),
+                        "tagged_products": len(results)
+                    }
+                })
+            else:
+                return jsonify({
+                    "status": "error",
+                    "message": "No results generated"
+                }), 500
+                
+        except Exception as e:
+            logger.error(f"Tagging failed: {str(e)}")
+            return jsonify({
+                "status": "error",
+                "message": str(e)
+            }), 500
+            
+        finally:
+            # Clean up temp files
+            if os.path.exists(temp_csv_path):
+                os.unlink(temp_csv_path)
+            if os.path.exists(temp_output_path):
+                os.unlink(temp_output_path)
                 
     except Exception as e:
         logger.error(f"Tag products simple failed: {str(e)}")
