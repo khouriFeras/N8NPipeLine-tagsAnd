@@ -1,0 +1,93 @@
+{
+  "name": "Simple Tagging Workflow (Railway)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare test data for tagging\nreturn [{\n  json: {\n    products_data: [\n      {\n        \"Title\": \"Cordless Drill 18V\",\n        \"Body (HTML)\": \"Powerful 18V cordless drill with two batteries and charger. Ideal for home DIY and professional use.\",\n        \"Product Type\": \"Power Tools\",\n        \"Vendor\": \"ToolMaster\"\n      },\n      {\n        \"Title\": \"Adjustable Wrench Set\",\n        \"Body (HTML)\": \"Set of 3 adjustable wrenches, chrome vanadium steel. Perfect for plumbing and automotive repairs.\",\n        \"Product Type\": \"Hand Tools\",\n        \"Vendor\": \"ProTools\"\n      },\n      {\n        \"Title\": \"LED Work Light\",\n        \"Body (HTML)\": \"Bright LED work light with magnetic base and adjustable head. Perfect for workshops and construction sites.\",\n        \"Product Type\": \"Lighting\",\n        \"Vendor\": \"BrightTools\"\n      }\n    ]\n  }\n}];"
+      },
+      "id": "prepare-test-data",
+      "name": "Prepare Test Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://jafartrans-tags.up.railway.app/api/tag-products-simple",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "={\n  \"Content-Type\": \"application/json\"\n}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "call-tagging-api",
+      "name": "Call Tagging API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process tagging results\nconst fileData = $input.first();\nconsole.log('=== TAGGING RESPONSE ===');\nconsole.log('File response received:', !!fileData.binary);\n\nif (fileData.binary && fileData.binary.data) {\n  let jsonContent;\n  \n  try {\n    // Handle different binary data formats\n    if (typeof fileData.binary.data === 'string') {\n      jsonContent = fileData.binary.data;\n    } else if (fileData.binary.data.data) {\n      jsonContent = Buffer.from(fileData.binary.data.data, 'base64').toString('utf8');\n    } else {\n      jsonContent = fileData.binary.data.toString('utf8');\n    }\n    \n    console.log('JSON content extracted, length:', jsonContent.length);\n    \n    // Parse the JSON response\n    const response = JSON.parse(jsonContent);\n    console.log('\\n📊 API RESPONSE:');\n    console.log('Status:', response.status);\n    console.log('Message:', response.message);\n    console.log('Data length:', response.data?.length || 0);\n    \n    if (response.status === 'success' && response.data) {\n      const taggedProducts = response.data;\n      console.log('\\n✅ SUCCESS: Found tagged products:', taggedProducts.length);\n      \n      // Show sample of tagged products\n      taggedProducts.forEach((product, i) => {\n        console.log(`Product ${i + 1}:`, {\n          Title: product.Title?.substring(0, 30) + '...',\n          Tags: product.tags?.substring(0, 50) + '...',\n          Confidence: product.confidence\n        });\n      });\n      \n      return {\n        json: {\n          success: true,\n          message: 'Products tagged successfully!',\n          total_products: response.stats?.total_products || 0,\n          tagged_products: response.stats?.tagged_products || 0,\n          results: taggedProducts.map(product => ({\n            title: product.Title,\n            tags: product.tags,\n            confidence: product.confidence,\n            choice_id: product.choice_id\n          }))\n        }\n      };\n    } else {\n      return {\n        json: {\n          success: false,\n          error: response.message || 'Tagging failed'\n        }\n      };\n    }\n  } catch (error) {\n    console.error('\\n💥 ERROR processing response:', error);\n    return {\n      json: {\n        success: false,\n        error: 'Failed to process response: ' + error.message\n      }\n    };\n  }\n} else {\n  return {\n    json: {\n      success: false,\n      error: 'No data received from API'\n    }\n  };\n}"
+      },
+      "id": "process-results",
+      "name": "Process Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Prepare Test Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Test Data": {
+      "main": [
+        [
+          {
+            "node": "Call Tagging API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Tagging API": {
+      "main": [
+        [
+          {
+            "node": "Process Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

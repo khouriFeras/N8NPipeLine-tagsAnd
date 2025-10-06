@@ -1,0 +1,542 @@
+{
+  "name": "Translation with Download Solution (Fixed) copy",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "ab71c406-180c-4378-94d2-431434de590d",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1600,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1iDbCdwFkCjZQ_cTUdbWg5IJifxn952YqWyKhA8b5YG4",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 120207084,
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1iDbCdwFkCjZQ_cTUdbWg5IJifxn952YqWyKhA8b5YG4/edit#gid=120207084"
+        },
+        "options": {}
+      },
+      "id": "8275940b-8af3-4cf3-9085-56278ff2a1e5",
+      "name": "Read Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -1376,
+        208
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "zsg8Ift7Xy26CKhM",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// BEST APPROACH: Simple, reliable CSV preparation\nconst items = $input.all();\nif (!items || items.length === 0) {\n  throw new Error('No data from Google Sheets');\n}\n\nconsole.log('=== PREPARING CSV FOR TRANSLATION ===');\nconsole.log('Total items:', items.length);\n\n// Get available columns\nconst headers = Object.keys(items[0].json);\nconsole.log('Available columns:', headers);\n\n// Find SKU column (try common names)\nconst possibleSkuColumns = ['SKU', 'sku', 'id', 'ID', 'product_id', 'Product ID', 'handle', 'Handle'];\nlet skuColumn = null;\nfor (const col of possibleSkuColumns) {\n  if (headers.includes(col)) {\n    skuColumn = col;\n    console.log(`✅ Found SKU column: ${col}`);\n    break;\n  }\n}\n\n// Check required columns\nconst requiredColumns = ['Title', 'Body (HTML)'];\nconst missingColumns = requiredColumns.filter(col => !headers.includes(col));\nif (missingColumns.length > 0) {\n  throw new Error(`Missing required columns: ${missingColumns.join(', ')}`);\n}\n\n// Build CSV headers (SKU first if found, then required columns)\nconst csvHeaders = [];\nif (skuColumn) {\n  csvHeaders.push(skuColumn);\n}\ncsvHeaders.push('Title', 'Body (HTML)');\n\nconsole.log('CSV headers:', csvHeaders);\n\n// Create CSV content\nconst csvRows = [csvHeaders.join(',')];\n\n// Process all items (not just sample)\nitems.forEach((item, index) => {\n  const row = csvHeaders.map(header => {\n    let value = String(item.json[header] || '');\n    // Escape CSV special characters\n    if (value.includes(',') || value.includes('\"') || value.includes('\\n') || value.includes('\\r')) {\n      value = '\"' + value.replace(/\"/g, '\"\"') + '\"';\n    }\n    return value;\n  });\n  csvRows.push(row.join(','));\n});\n\nconst csvContent = csvRows.join('\\n');\nconsole.log(`Generated CSV: ${csvRows.length} rows (including header)`);\nconsole.log('First few rows:', csvRows.slice(0, 3));\n\nreturn {\n  json: {\n    csv_content: csvContent,\n    total_rows: items.length,\n    product_context: 'house equipment and tv dishwashers refrigerator freezer food processor air conditioning',\n    sample: items.length,\n    sku_column: skuColumn\n  }\n};"
+      },
+      "id": "ba2b2dc5-7aed-40d8-b5ab-90797bcb6c2d",
+      "name": "Prepare CSV",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1152,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://jafartrans-tags.up.railway.app/process",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "csv_content",
+              "value": "={{ $json.csv_content }}"
+            },
+            {
+              "name": "product_context",
+              "value": "={{ $json.product_context }}"
+            },
+            {
+              "name": "sample",
+              "value": "={{ $json.sample }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "f9d264a8-c41f-409b-abe2-b4d3d44c4691",
+      "name": "Call Translation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -928,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nif (response.success) {\n  const fileId = response.file_id || '';\n  return {\n    json: {\n      success: true,\n      message: 'Translation and SEO processing completed! Ready to download.',\n      file_id: fileId,\n      download_url: `https://jafartrans-tags.up.railway.app/download/${fileId}`,\n      translation_details: {\n        total_processed: response.result?.total_processed || 0,\n        translation_successful: response.result?.translation_successful || 0,\n        seo_successful: response.result?.seo_successful || 0,\n        failed: response.result?.failed || 0,\n        output_size: response.output_size\n      },\n      // IMPORTANT: Include the actual translation results from API\n      translation_results: response.result?.data || response.data || [],\n      output_columns: response.output_columns || [\n        'arabic description', 'product_title_ar', 'meta_title', 'meta_description', 'handle_ar'\n      ],\n      features: response.features || {\n        translation: 'Arabic product descriptions and titles',\n        seo: 'Meta titles, descriptions, and SEO-friendly handles',\n        combined: 'All data appended to new columns in the output file'\n      }\n    }\n  };\n} else {\n  return {\n    json: {\n      success: false,\n      error: response.error || 'Translation and SEO processing failed'\n    }\n  };\n}"
+      },
+      "id": "d791cd96-c4e9-487b-a892-1bc8273ea668",
+      "name": "Process Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -704,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.download_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "c79da6fc-4d6d-4753-9874-02e57a733505",
+      "name": "Download File",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -480,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "options": {
+          "readFromBinary": true,
+          "binaryPropertyName": "data",
+          "firstRowAsHeader": true
+        }
+      },
+      "id": "c8b8d6d0-READ-TRANSLATED-XLSX",
+      "name": "Spreadsheet File",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 1,
+      "position": [
+        -256,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// UPDATED: Include SKU in output and match by SKU\nconst originalRows = $('Read Google Sheets').all();\nconst translatedRows = $('Spreadsheet File').all();\n\nconsole.log('=== TRANSLATION DATA MAPPING WITH SKU ===');\nconsole.log('Original rows:', originalRows.length);\nconsole.log('Translated rows:', translatedRows.length);\n\n// Translation columns we want to extract\nconst translationColumns = [\n  'arabic description',\n  'product_title_ar', \n  'meta_title',\n  'meta_description',\n  'handle_ar'\n];\n\n// Safety check\nif (!translatedRows.length) {\n  throw new Error('No translated data found. Check if Spreadsheet File node is working correctly.');\n}\n\n// Show what columns are available in translated data\nif (translatedRows.length > 0) {\n  console.log('Available columns in translated data:', Object.keys(translatedRows[0].json || {}));\n  console.log('Sample translated row:', JSON.stringify(translatedRows[0], null, 2));\n}\n\n// Find the best matching column (SKU, ID, etc.)\nlet matchColumn = null;\nconst possibleMatchColumns = ['SKU', 'sku', 'id', 'ID', 'product_id', 'Product ID', 'handle', 'Handle'];\n\nif (originalRows.length > 0 && translatedRows.length > 0) {\n  const originalKeys = Object.keys(originalRows[0].json || {});\n  const translatedKeys = Object.keys(translatedRows[0].json || {});\n  \n  // Find a common column for matching\n  for (const col of possibleMatchColumns) {\n    if (originalKeys.includes(col) && translatedKeys.includes(col)) {\n      matchColumn = col;\n      console.log(`✅ Found matching column: ${col}`);\n      break;\n    }\n  }\n  \n  if (!matchColumn) {\n    console.log('⚠️ No matching column found, using index-based matching');\n  }\n}\n\n// Create the output data - IMPORTANT: Include SKU for Google Sheets update\nconst output = [];\n\nif (matchColumn) {\n  // MATCH BY COLUMN (Best approach)\n  console.log(`🔄 Matching by ${matchColumn}...`);\n  \n  originalRows.forEach((originalRow, index) => {\n    const originalValue = originalRow.json[matchColumn];\n    const translatedRow = translatedRows.find(t => t.json[matchColumn] === originalValue);\n    \n    if (translatedRow) {\n      // Create row with SKU + translation data\n      const rowData = {\n        [matchColumn]: originalValue  // Include SKU for matching in Google Sheets\n      };\n      \n      translationColumns.forEach(col => {\n        rowData[col] = translatedRow.json[col] || '';\n      });\n      \n      output.push({ json: rowData });\n      console.log(`✅ Row ${index + 1}: Matched ${originalValue}`);\n    } else {\n      // No match found - create empty row with SKU\n      const rowData = {\n        [matchColumn]: originalValue  // Include SKU even if no translation\n      };\n      \n      translationColumns.forEach(col => {\n        rowData[col] = '';\n      });\n      \n      output.push({ json: rowData });\n      console.log(`❌ Row ${index + 1}: No match for ${originalValue}`);\n    }\n  });\n} else {\n  // MATCH BY INDEX (Fallback)\n  console.log('🔄 Using index-based matching...');\n  \n  originalRows.forEach((originalRow, index) => {\n    const translatedRow = translatedRows[index] || {};\n    \n    // Try to find SKU column in original data\n    let skuValue = '';\n    for (const col of possibleMatchColumns) {\n      if (originalRow.json[col]) {\n        skuValue = originalRow.json[col];\n        break;\n      }\n    }\n    \n    const rowData = {\n      SKU: skuValue  // Include SKU for matching\n    };\n    \n    translationColumns.forEach(col => {\n      rowData[col] = translatedRow.json?.[col] || '';\n    });\n    \n    output.push({ json: rowData });\n    console.log(`📝 Row ${index + 1}: Index-based mapping (SKU: ${skuValue})`);\n  });\n}\n\nconsole.log(`\\n🎯 Final Result:`);\nconsole.log(`- Processed ${output.length} rows`);\nconsole.log(`- Matching method: ${matchColumn ? `Column (${matchColumn})` : 'Index'}`);\nconsole.log(`- Sample output:`, JSON.stringify(output[0], null, 2));\n\nreturn output;"
+      },
+      "id": "translation-update-prep",
+      "name": "Prepare Translation Update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -256,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1iDbCdwFkCjZQ_cTUdbWg5IJifxn952YqWyKhA8b5YG4",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 120207084,
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1iDbCdwFkCjZQ_cTUdbWg5IJifxn952YqWyKhA8b5YG4/edit#gid=120207084"
+        },
+        "operation": "update",
+        "options": {
+          "useAppend": false
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData"
+        }
+      },
+      "id": "update-translation-sheet",
+      "name": "Update Translation Columns",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -32,
+        400
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "zsg8Ift7Xy26CKhM",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const translationData = $input.first().json;\nconst downloadData = $input.last();\n\nreturn {\n  json: {\n    success: true,\n    message: 'Translation and SEO processing completed and file downloaded successfully!',\n    translation_summary: {\n      total_processed: translationData.translation_details?.total_processed || 'unknown',\n      translation_successful: translationData.translation_details?.translation_successful || 'unknown',\n      seo_successful: translationData.translation_details?.seo_successful || 'unknown',\n      failed: translationData.translation_details?.failed || 0,\n      output_size: translationData.translation_details?.output_size\n    },\n    file_info: {\n      downloaded: downloadData.binary ? 'Yes' : 'No',\n      file_size: downloadData.binary?.data?.length || 0,\n      filename: 'translated_products_with_seo.xlsx'\n    },\n    output_columns: translationData.output_columns || [\n      'arabic description', 'product_title_ar', 'meta_title', 'meta_description', 'handle_ar'\n    ],\n    features: translationData.features || {\n      translation: 'Arabic product descriptions and titles',\n      seo: 'Meta titles, descriptions, and SEO-friendly handles',\n      combined: 'All data appended to new columns in the output file'\n    },\n    arabic_content_generated: [\n      'Arabic product descriptions and titles',\n      'Arabic SEO meta titles optimized for search engines',\n      'Arabic SEO meta descriptions for better visibility',\n      'SEO-friendly handles for URL generation',\n      'Combined translation and SEO data in new columns'\n    ],\n    completion_message: [\n      'Your products now have complete Arabic translations and SEO optimization!',\n      'Ready for Arabic-speaking markets with enhanced search visibility',\n      'All translation and SEO data appended to new columns',\n      'Download the Excel file with combined translation and SEO data'\n    ]\n  },\n  binary: downloadData.binary\n};"
+      },
+      "id": "08fb9d3c-649f-43f5-bb4d-52878f851d05",
+      "name": "Final Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -256,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// UPDATED: Prepare data for tagging API with better debugging\nconst originalData = $('Read Google Sheets').all();\n\nconsole.log('=== PREPARING TAGGING DATA ===');\nconsole.log('Total products from Google Sheets:', originalData.length);\nconsole.log('Available columns:', Object.keys(originalData[0]?.json || {}));\n\n// Process all products with better error handling\nconst productsData = originalData.map((item, index) => {\n  const product = {\n    Title: item.json.Title || item.json.title || item.json['Product Name'] || '',\n    'Product Type': item.json['Product Type'] || item.json.category || item.json.type || '',\n    Vendor: item.json.Vendor || item.json.vendor || item.json.brand || '',\n    'Body (HTML)': item.json['Body (HTML)'] || item.json.description || item.json.content || ''\n  };\n  \n  // Log each product for debugging\n  console.log(`Product ${index + 1}:`, {\n    Title: product.Title.substring(0, 50) + '...',\n    Type: product['Product Type'],\n    Vendor: product.Vendor,\n    HasDescription: product['Body (HTML)'].length > 0\n  });\n  \n  return product;\n});\n\n// Filter out products without required data\nconst validProducts = productsData.filter(product => \n  product.Title && product.Title.trim() !== '' && \n  product['Body (HTML)'] && product['Body (HTML)'].trim() !== ''\n);\n\nconsole.log(`\\n📊 TAGGING DATA SUMMARY:`);\nconsole.log(`- Total products: ${productsData.length}`);\nconsole.log(`- Valid products (with Title + Description): ${validProducts.length}`);\nconsole.log(`- Invalid products: ${productsData.length - validProducts.length}`);\n\nif (validProducts.length === 0) {\n  throw new Error('No valid products found for tagging. Check that products have Title and Body (HTML) fields.');\n}\n\n// Show sample of what will be sent to API\nconsole.log('\\n📤 Sample products being sent to tagging API:');\nvalidProducts.slice(0, 3).forEach((product, i) => {\n  console.log(`Sample ${i + 1}:`, {\n    Title: product.Title.substring(0, 30) + '...',\n    Type: product['Product Type'],\n    DescriptionLength: product['Body (HTML)'].length\n  });\n});\n\nreturn [{\n  json: {\n    products_data: validProducts  // Send only valid products\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -32,
+        208
+      ],
+      "id": "c2a38fe3-b85d-4873-ae73-ab09b72a4f2d",
+      "name": "Prepare Tagging Data"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://jafartrans-tags.up.railway.app/api/tag-products-simple",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "={\n  \"Content-Type\": \"application/json\"\n}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "file"
+            }
+          },
+          "timeout": 600000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        192,
+        208
+      ],
+      "id": "1b63cdaf-0b98-481d-80e8-ac1445a1ba70",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "// UPDATED: Enhanced debugging for tagging response\nconst fileData = $input.first();\nconsole.log('=== TAGGING RESPONSE DEBUGGING ===');\nconsole.log('File response received:', !!fileData.binary);\n\nif (fileData.binary && fileData.binary.data) {\n  let jsonContent;\n  \n  try {\n    // Handle different binary data formats\n    if (typeof fileData.binary.data === 'string') {\n      jsonContent = fileData.binary.data;\n    } else if (fileData.binary.data.data) {\n      jsonContent = Buffer.from(fileData.binary.data.data, 'base64').toString('utf8');\n    } else {\n      jsonContent = fileData.binary.data.toString('utf8');\n    }\n    \n    console.log('JSON content extracted, length:', jsonContent.length);\n    \n    // Fix NaN values before parsing JSON\n    const cleanedJsonContent = jsonContent\n      .replace(/:\\s*NaN/g, ': null')  // Replace : NaN with : null\n      .replace(/:\\s*Infinity/g, ': null')  // Replace : Infinity with : null\n      .replace(/:\\s*-Infinity/g, ': null'); // Replace : -Infinity with : null\n    \n    console.log('Cleaned JSON content preview:', cleanedJsonContent.substring(0, 500) + '...');\n    \n    const response = JSON.parse(cleanedJsonContent);\n    console.log('\\n📊 API RESPONSE ANALYSIS:');\n    console.log('Status:', response.status);\n    console.log('Message:', response.message);\n    console.log('Has data array:', !!response.data);\n    console.log('Data type:', typeof response.data);\n    console.log('Data length:', Array.isArray(response.data) ? response.data.length : 'Not an array');\n    \n    if (response.stats) {\n      console.log('\\n📈 API STATS:');\n      console.log('Total products:', response.stats.total_products);\n      console.log('Tagged products:', response.stats.tagged_products);\n    }\n    \n    if (response.status === 'success' && response.data && Array.isArray(response.data)) {\n      const taggedProducts = response.data;\n      console.log('\\n✅ SUCCESS: Found tagged products:', taggedProducts.length);\n      \n      // Show sample of tagged products\n      console.log('\\n📋 SAMPLE TAGGED PRODUCTS:');\n      taggedProducts.slice(0, 3).forEach((product, i) => {\n        console.log(`Product ${i + 1}:`, {\n          Title: product.Title?.substring(0, 30) + '...',\n          Type: product['Product Type'],\n          HasTags: !!product.tags,\n          Tags: product.tags?.substring(0, 50) + '...',\n          Confidence: product.confidence\n        });\n      });\n      \n      // Count products with tags\n      const productsWithTags = taggedProducts.filter(p => p.tags && p.tags.trim() !== '');\n      console.log(`\\n🎯 TAGGING SUMMARY:`);\n      console.log(`- Total products returned: ${taggedProducts.length}`);\n      console.log(`- Products with tags: ${productsWithTags.length}`);\n      console.log(`- Products without tags: ${taggedProducts.length - productsWithTags.length}`);\n      \n      // Return each tagged product as a separate item\n      return taggedProducts.map(product => ({\n        json: {\n          Title: product.Title || '',\n          'Product Type': product['Product Type'] || '',\n          Vendor: product.Vendor || '',\n          'Body (HTML)': product['Body (HTML)'] || '',\n          choice_id: product.choice_id || '',\n          confidence: product.confidence || 0,\n          product_id: product.product_id || '',\n          tags: product.tags || '',\n          title: product.title || product.Title || '',\n          verified: product.verified || 0\n        }\n      }));\n    } else {\n      console.log('\\n❌ FAILED: Tagging failed:', response);\n      return [{\n        json: {\n          error: response?.message || 'Tagging failed',\n          status: response?.status || 'error'\n        }\n      }];\n    }\n  } catch (error) {\n    console.error('\\n💥 ERROR processing file data:', error);\n    console.log('JSON content around error:', jsonContent.substring(0, 1000));\n    return [{\n      json: {\n        error: 'Failed to process file data: ' + error.message\n      }\n    }];\n  }\n} else {\n  console.log('\\n❌ No file data received');\n  return [{\n    json: {\n      error: 'No file data received from HTTP Request'\n    }\n  }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        208
+      ],
+      "id": "d9f8f34f-2605-4918-a139-f71c67e59348",
+      "name": "Flatten Tagging Response"
+    },
+    {
+      "parameters": {
+        "content": "the project generates  5 essential columns:\narabic description - Full Arabic product description\nproduct_title_ar - Arabic product title (50-80 characters)\nmeta_title - SEO meta title (≤60 characters)\nmeta_description - SEO meta description (≤155 characters)\nhandle_ar - SEO-friendly handle for URLs\n\nPLUS TAGGING:\ntags - Taxonomy tags for categorization\ntagged - Whether product was successfully tagged\ntag_confidence - Confidence level of tagging",
+        "width": 512
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1056,
+        0
+      ],
+      "typeVersion": 1,
+      "id": "09623918-0167-4562-a881-83d435ce57dd",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "click on excel and change the ID \n\nthe ID IS the link of your excel file \nexample has \nhttps://docs.google.com/spreadsheets/d/1iDbCdwFkCjZQ_cTUdbWg5IJifxn952YqWyKhA8b5YG4/edit?gid=120207084#gid=120207084\nid is between d/ and  /edit \nin this case 1iDbCdwFkCjZQ_cTUdbWg5IJifxn952YqWyKhA8b5YG4 ",
+        "height": 192,
+        "width": 416
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1776,
+        -16
+      ],
+      "typeVersion": 1,
+      "id": "d6f3b881-5cec-46a8-a8e1-bbc6a1ce724e",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// UPDATED: Include SKU in tags output and match by SKU\nconst taggedData = $input.all();\nconst originalData = $('Read Google Sheets').all();\n\nconsole.log('=== TAGS DATA MAPPING WITH SKU ===');\nconsole.log('Tagged data received:', taggedData.length, 'items');\nconsole.log('Original data rows:', originalData.length, 'items');\nconsole.log('Sample tagged item:', JSON.stringify(taggedData[0], null, 2));\n\n// Find the best matching column (SKU, ID, etc.)\nlet matchColumn = null;\nconst possibleMatchColumns = ['SKU', 'sku', 'id', 'ID', 'product_id', 'Product ID', 'handle', 'Handle'];\n\nif (originalData.length > 0) {\n  const originalKeys = Object.keys(originalData[0].json || {});\n  \n  // Find SKU column in original data\n  for (const col of possibleMatchColumns) {\n    if (originalKeys.includes(col)) {\n      matchColumn = col;\n      console.log(`✅ Found SKU column in original data: ${col}`);\n      break;\n    }\n  }\n  \n  if (!matchColumn) {\n    console.log('⚠️ No SKU column found in original data, using index-based matching');\n  }\n}\n\n// Create the output data - IMPORTANT: Include SKU for Google Sheets update\nconst items = [];\n\nif (matchColumn) {\n  // MATCH BY COLUMN (Best approach)\n  console.log(`🔄 Matching tags by ${matchColumn}...`);\n  \n  originalData.forEach((originalItem, index) => {\n    const originalValue = originalItem.json[matchColumn];\n    const taggedItem = taggedData[index] || {};\n    \n    console.log(`Row ${index + 1}: SKU=${originalValue}, Tags=${taggedItem.json?.tags || ''}`);\n    \n    items.push({\n      json: {\n        [matchColumn]: originalValue,  // Include SKU for matching in Google Sheets\n        'tags': taggedItem.json?.tags || ''\n      }\n    });\n  });\n} else {\n  // MATCH BY INDEX (Fallback)\n  console.log('🔄 Using index-based matching for tags...');\n  \n  originalData.forEach((originalItem, index) => {\n    const taggedItem = taggedData[index] || {};\n    \n    // Try to find SKU column in original data\n    let skuValue = '';\n    for (const col of possibleMatchColumns) {\n      if (originalItem.json[col]) {\n        skuValue = originalItem.json[col];\n        break;\n      }\n    }\n    \n    console.log(`Row ${index + 1}: SKU=${skuValue}, Tags=${taggedItem.json?.tags || ''}`);\n    \n    items.push({\n      json: {\n        SKU: skuValue,  // Include SKU for matching\n        'tags': taggedItem.json?.tags || ''\n      }\n    });\n  });\n}\n\nconsole.log(`\\n🎯 Tags Final Result:`);\nconsole.log(`- Processed ${items.length} rows`);\nconsole.log(`- Matching method: ${matchColumn ? `Column (${matchColumn})` : 'Index'}`);\nconsole.log(`- Sample output:`, JSON.stringify(items[0], null, 2));\n\nreturn items;"
+      },
+      "id": "tags-update-prep",
+      "name": "Prepare Tags Update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1iDbCdwFkCjZQ_cTUdbWg5IJifxn952YqWyKhA8b5YG4",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 120207084,
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1iDbCdwFkCjZQ_cTUdbWg5IJifxn952YqWyKhA8b5YG4/edit#gid=120207084"
+        },
+        "operation": "update",
+        "options": {
+          "useAppend": false
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData"
+        }
+      },
+      "id": "update-tags-sheet",
+      "name": "Update Tags Column",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        640,
+        400
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "zsg8Ift7Xy26CKhM",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        624,
+        208
+      ],
+      "id": "3da7d6bd-6e8b-46f7-af82-e9ad038ae916",
+      "name": "Convert to File"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Prepare CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare CSV": {
+      "main": [
+        [
+          {
+            "node": "Call Translation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Translation": {
+      "main": [
+        [
+          {
+            "node": "Process Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Results": {
+      "main": [
+        [
+          {
+            "node": "Download File",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare Translation Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download File": {
+      "main": [
+        [
+          {
+            "node": "Final Results",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Spreadsheet File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Final Results": {
+      "main": [
+        [
+          {
+            "node": "Prepare Tagging Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Tagging Data": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Flatten Tagging Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flatten Tagging Response": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare Tags Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Translation Update": {
+      "main": [
+        [
+          {
+            "node": "Update Translation Columns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Tags Update": {
+      "main": [
+        [
+          {
+            "node": "Update Tags Column",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Spreadsheet File": {
+      "main": [
+        [
+          {
+            "node": "Prepare Translation Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "bce9f2f2-349f-4329-9405-564a495dc74c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f10f40e048c57295500401801c2b0cc02ded7384484c5deecefba1967a1e01eb"
+  },
+  "id": "ncnzIA0d977n2sxq",
+  "tags": []
+}

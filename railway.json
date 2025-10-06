@@ -4,7 +4,7 @@
     "dockerfilePath": "Dockerfile.translation"
   },
   "deploy": {
-    "startCommand": "python web_service.py",
+    "startCommand": "python unified_api.py",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
   }
