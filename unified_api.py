@@ -259,27 +259,78 @@ def tag_products_simple():
         
         logger.info(f"Processing {len(products)} products for tagging")
         
-        # For now, return a simple response with mock tags
-        # This will help us test the endpoint without the complex taxonomy setup
+        # Enhanced tagging logic based on product analysis
         results = []
         for i, product in enumerate(products):
-            title = product.get('Title', '')
-            product_type = product.get('Product Type', '')
+            title = product.get('Title', '').lower()
+            product_type = product.get('Product Type', '').lower()
+            description = product.get('Body (HTML)', '').lower()
             
-            # Generate simple mock tags based on product type
-            if 'drill' in title.lower() or 'power' in product_type.lower():
-                tags = "tools,power-tools,drills"
-            elif 'hammer' in title.lower() or 'hand' in product_type.lower():
-                tags = "tools,hand-tools,hammers"
+            # Combine all text for better analysis
+            all_text = f"{title} {product_type} {description}"
+            
+            # Enhanced tagging logic
+            tags = []
+            
+            # Main category detection
+            if any(word in all_text for word in ['drill', 'drilling', 'perforator', 'perforadora']):
+                tags = ["tools", "power-tools", "drills"]
+            elif any(word in all_text for word in ['hammer', 'martillo', 'marteau']):
+                tags = ["tools", "hand-tools", "hammers"]
+            elif any(word in all_text for word in ['saw', 'sierra', 'scie', 'cutting', 'corte']):
+                tags = ["tools", "cutting-tools", "saws"]
+            elif any(word in all_text for word in ['wrench', 'llave', 'clé', 'spanner']):
+                tags = ["tools", "hand-tools", "wrenches"]
+            elif any(word in all_text for word in ['screwdriver', 'destornillador', 'tournevis']):
+                tags = ["tools", "hand-tools", "screwdrivers"]
+            elif any(word in all_text for word in ['pliers', 'alicates', 'pinces']):
+                tags = ["tools", "hand-tools", "pliers"]
+            elif any(word in all_text for word in ['level', 'nivel', 'niveau', 'spirit']):
+                tags = ["tools", "measuring-tools", "levels"]
+            elif any(word in all_text for word in ['tape', 'cinta', 'ruban', 'measure']):
+                tags = ["tools", "measuring-tools", "tape-measures"]
+            elif any(word in all_text for word in ['battery', 'batería', 'batterie', 'rechargeable']):
+                tags = ["tools", "power-tools", "battery-powered"]
+            elif any(word in all_text for word in ['cordless', 'inalámbrico', 'sans fil']):
+                tags = ["tools", "power-tools", "cordless"]
+            elif any(word in all_text for word in ['kit', 'set', 'juego', 'jeu', 'combo']):
+                tags = ["tools", "tool-sets", "kits"]
+            elif any(word in all_text for word in ['safety', 'seguridad', 'sécurité', 'helmet', 'goggles']):
+                tags = ["safety", "protective-equipment", "safety-gear"]
+            elif any(word in all_text for word in ['clothing', 'ropa', 'vêtements', 'uniform', 'workwear']):
+                tags = ["clothing", "workwear", "uniforms"]
+            elif any(word in all_text for word in ['electrical', 'eléctrico', 'électrique', 'wire', 'cable']):
+                tags = ["electrical", "wiring", "cables"]
+            elif any(word in all_text for word in ['plumbing', 'plomería', 'plomberie', 'pipe', 'water']):
+                tags = ["plumbing", "pipes", "water-systems"]
+            elif any(word in all_text for word in ['automotive', 'automotriz', 'automobile', 'car', 'vehicle']):
+                tags = ["automotive", "vehicle-parts", "car-accessories"]
+            elif any(word in all_text for word in ['kitchen', 'cocina', 'cuisine', 'cooking', 'food']):
+                tags = ["kitchen", "cooking", "food-preparation"]
+            elif any(word in all_text for word in ['garden', 'jardín', 'jardin', 'outdoor', 'lawn']):
+                tags = ["garden", "outdoor", "landscaping"]
+            elif any(word in all_text for word in ['cleaning', 'limpieza', 'nettoyage', 'mop', 'brush']):
+                tags = ["cleaning", "maintenance", "hygiene"]
             else:
-                tags = "tools,general"
+                # Default based on product type
+                if 'tool' in product_type:
+                    tags = ["tools", "general-tools"]
+                elif 'equipment' in product_type:
+                    tags = ["equipment", "general-equipment"]
+                elif 'accessory' in product_type:
+                    tags = ["accessories", "general-accessories"]
+                else:
+                    tags = ["general", "miscellaneous"]
+            
+            # Join tags with commas
+            tags_string = ",".join(tags)
             
             results.append({
-                "Title": title,
-                "Product Type": product_type,
+                "Title": product.get('Title', ''),
+                "Product Type": product.get('Product Type', ''),
                 "Vendor": product.get('Vendor', ''),
                 "Body (HTML)": product.get('Body (HTML)', ''),
-                "tags": tags,
+                "tags": tags_string,
                 "confidence": 0.85,
                 "product_id": f"prod_{i+1}",
                 "choice_id": f"choice_{i+1}",
